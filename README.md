@@ -3,7 +3,7 @@
 
 A collection of poetry exploring themes of memory, family, and emotional healing.
 
-**[Visit the Interactive Gallery →]()**
+**[Visit the Interactive Gallery →](https://lunabriana98-creator.github.io/between-the-lines/)**
 
 **Features:**
 - 3D walkable gallery space
