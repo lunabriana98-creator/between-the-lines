@@ -12,3 +12,6 @@ A collection of poetry exploring themes of memory, family, and emotional healing
 - 12 original poems
 
 © 2025 Briana Luna
+## Credits
+Poetry & Creative Direction: Briana Luna
+Technical Development: Built with assistance from Claude (Anthropic)
