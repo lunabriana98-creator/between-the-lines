@@ -1,0 +1,1175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Between the Lines - Poetry Gallery</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Georgia, serif;
+        }
+        #container {
+            width: 100vw;
+            height: 100vh;
+        }
+        .overlay {
+            position: absolute;
+            color: white;
+            text-align: center;
+            pointer-events: none;
+            text-shadow: 3px 3px 8px rgba(0,0,0,0.9);
+        }
+        #title {
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 42px;
+            font-style: italic;
+            color: #ffd9ff;
+            letter-spacing: 2px;
+        }
+        #author {
+            top: 85px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 18px;
+            color: #d9b3ff;
+        }
+        #controls {
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 15px;
+            background: rgba(26, 10, 46, 0.6);
+            padding: 12px 24px;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <div class="overlay" id="title">Between the Lines</div>
+    <div class="overlay" id="author">by Briana Luna</div>
+    <div class="overlay" id="controls">WASD to move • Hold SHIFT to run • Move mouse to look • Click poems 3 times to shatter the barrier</div>
+    <div class="overlay" id="audioPrompt" style="top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 24px; background: rgba(26, 10, 46, 0.9); padding: 30px 50px; border-radius: 15px; cursor: pointer; pointer-events: all; border: 2px solid #ff6b9d;">
+        Click to Enter & Play Music
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script>
+        // Audio setup - soft melancholic piano and violin
+        let audioStarted = false;
+        let ambientSynth, pianoSynth, violinSynth, chordSynth, glassChime, softChime;
+        
+        function initAudio() {
+            // Soft ambient pad
+            ambientSynth = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: 'sine' },
+                envelope: {
+                    attack: 4,
+                    decay: 3,
+                    sustain: 0.8,
+                    release: 10
+                }
+            }).toDestination();
+            ambientSynth.volume.value = -22;
+            
+            const reverb = new Tone.Reverb({
+                decay: 8,
+                wet: 0.6
+            }).toDestination();
+            ambientSynth.connect(reverb);
+            
+            // Soft, warm Piano
+            pianoSynth = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { 
+                    type: 'triangle'
+                },
+                envelope: {
+                    attack: 0.01,
+                    decay: 0.5,
+                    sustain: 0.3,
+                    release: 3
+                }
+            }).toDestination();
+            pianoSynth.volume.value = -10;
+            
+            const pianoReverb = new Tone.Reverb({
+                decay: 3,
+                wet: 0.3
+            }).toDestination();
+            pianoSynth.connect(pianoReverb);
+            
+            // Soft Violin (warm string sound)
+            violinSynth = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { 
+                    type: 'sine'
+                },
+                envelope: {
+                    attack: 0.5,
+                    decay: 0.3,
+                    sustain: 0.9,
+                    release: 2
+                }
+            }).toDestination();
+            violinSynth.volume.value = -14;
+            
+            // Gentle vibrato for violin
+            const vibrato = new Tone.Vibrato({
+                frequency: 4,
+                depth: 0.1
+            }).toDestination();
+            violinSynth.connect(vibrato);
+            violinSynth.connect(reverb);
+            
+            // Soft chord synth
+            chordSynth = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: 'sine' },
+                envelope: {
+                    attack: 3,
+                    decay: 2,
+                    sustain: 0.7,
+                    release: 6
+                }
+            }).toDestination();
+            chordSynth.volume.value = -22;
+            chordSynth.connect(reverb);
+            
+            // Soft chime for mouse clicks
+            softChime = new Tone.Synth({
+                oscillator: { type: 'sine' },
+                envelope: {
+                    attack: 0.001,
+                    decay: 0.3,
+                    sustain: 0.1,
+                    release: 0.8
+                }
+            }).toDestination();
+            softChime.volume.value = -15;
+            
+            const chimeReverb = new Tone.Reverb({
+                decay: 2,
+                wet: 0.5
+            }).toDestination();
+            softChime.connect(chimeReverb);
+            
+            // Glass-like chime for barrier clicks
+            glassChime = new Tone.MetalSynth({
+                frequency: 200,
+                envelope: {
+                    attack: 0.001,
+                    decay: 0.4,
+                    release: 0.8
+                },
+                harmonicity: 12,
+                modulationIndex: 20,
+                resonance: 3000,
+                octaves: 1.5
+            }).toDestination();
+            glassChime.volume.value = -10;
+            
+            return reverb.generate();
+        }
+        
+        function playMelancholicAmbience() {
+            if (!audioStarted) return;
+            
+            // Gentle chord progression in C major/Am (softer, less dark)
+            const chordProgression = [
+                ['C3', 'E3', 'G3'],  // C
+                ['A2', 'C3', 'E3'],  // Am
+                ['F3', 'A3', 'C4'],  // F
+                ['G3', 'B3', 'D4']   // G
+            ];
+            
+            // Soft, gentle piano melody
+            const pianoMelody = [
+                'E4', 'G4', 'C5', 'B4', 'A4', 'G4', 'F4', 'E4',
+                'C4', 'E4', 'G4', 'A4', 'G4', 'F4', 'E4', 'D4'
+            ];
+            
+            // Tender violin melody
+            const violinMelody = [
+                'G4', 'C5', 'E5', 'D5', 'C5', 'B4', 'A4', 'G4',
+                'E5', 'D5', 'C5', 'B4', 'C5', 'A4', 'G4', 'C5'
+            ];
+            
+            let chordIndex = 0;
+            let pianoIndex = 0;
+            let violinIndex = 0;
+            
+            // Gentle chords
+            Tone.Transport.scheduleRepeat((time) => {
+                chordSynth.triggerAttackRelease(chordProgression[chordIndex % 4], '2n', time);
+                chordIndex++;
+            }, '2n');
+            
+            // Soft piano - more frequent, gentle
+            Tone.Transport.scheduleRepeat((time) => {
+                if (Math.random() > 0.1) {
+                    pianoSynth.triggerAttackRelease(pianoMelody[pianoIndex % 16], '8n', time);
+                }
+                pianoIndex++;
+            }, '8n');
+            
+            // Tender violin - flowing
+            Tone.Transport.scheduleRepeat((time) => {
+                if (Math.random() > 0.25) {
+                    violinSynth.triggerAttackRelease(violinMelody[violinIndex % 16], '4n', time);
+                }
+                violinIndex++;
+            }, '4n');
+            
+            // Soft ambient pad
+            Tone.Transport.scheduleRepeat((time) => {
+                ambientSynth.triggerAttackRelease(['C3', 'G3'], '1n', time);
+            }, '1n');
+            
+            Tone.Transport.bpm.value = 60; // Gentle tempo
+            Tone.Transport.start();
+        }
+        
+        // Musical scale for mouse clicks (pentatonic - always sounds good!)
+        const clickScale = ['C4', 'D4', 'E4', 'G4', 'A4', 'C5', 'D5', 'E5', 'G5', 'A5'];
+        let clickNoteIndex = 0;
+        
+        function playMouseClickSound() {
+            if (!audioStarted) return;
+            const note = clickScale[clickNoteIndex % clickScale.length];
+            softChime.triggerAttackRelease(note, '16n');
+            clickNoteIndex++;
+        }
+        
+        function playGlassSound(pitch = 1) {
+            if (!audioStarted) return;
+            const freq = 800 * pitch;
+            glassChime.frequency.value = freq;
+            glassChime.triggerAttackRelease('16n');
+        }
+        
+        function playShatterSound() {
+            if (!audioStarted) return;
+            // Multiple glass chimes for shatter effect
+            for (let i = 0; i < 8; i++) {
+                setTimeout(() => {
+                    playGlassSound(0.8 + Math.random() * 0.8);
+                }, i * 50);
+            }
+        }
+        
+        // Audio prompt interaction
+        document.getElementById('audioPrompt').addEventListener('click', async () => {
+            await Tone.start();
+            await initAudio();
+            audioStarted = true;
+            playMelancholicAmbience();
+            document.getElementById('audioPrompt').style.display = 'none';
+        });
+        
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0612);
+        scene.fog = new THREE.Fog(0x0a0612, 1, 60);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 1.6, 12);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.getElementById('container').appendChild(renderer.domElement);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+        scene.add(ambientLight);
+        
+        const spotlight1 = new THREE.SpotLight(0xff6b9d, 1.5);
+        spotlight1.position.set(8, 6, 8);
+        scene.add(spotlight1);
+        
+        const spotlight2 = new THREE.SpotLight(0x9d6bff, 1.5);
+        spotlight2.position.set(-8, 6, 8);
+        scene.add(spotlight2);
+
+        // Enhanced atmospheric fog layers
+        const fogLayers = [];
+        for (let i = 0; i < 3; i++) {
+            const fogGeometry = new THREE.PlaneGeometry(100, 100);
+            const fogMaterial = new THREE.MeshBasicMaterial({
+                color: [0xff6b9d, 0x9d6bff, 0x6bffd9][i],
+                transparent: true,
+                opacity: 0.03,
+                side: THREE.DoubleSide,
+                blending: THREE.AdditiveBlending
+            });
+            const fog = new THREE.Mesh(fogGeometry, fogMaterial);
+            fog.rotation.x = Math.PI / 2;
+            fog.position.y = 2 + i * 1.5;
+            fogLayers.push({ mesh: fog, speed: 0.3 + i * 0.1 });
+            scene.add(fog);
+        }
+
+        // Floating ambient particles - SILVER FAIRY GLITTER
+        const particleCount = 200;
+        const particlesGeometry = new THREE.BufferGeometry();
+        const particlePositions = new Float32Array(particleCount * 3);
+        const particleColors = new Float32Array(particleCount * 3);
+        
+        for (let i = 0; i < particleCount; i++) {
+            particlePositions[i * 3] = (Math.random() - 0.5) * 60;
+            particlePositions[i * 3 + 1] = Math.random() * 8;
+            particlePositions[i * 3 + 2] = (Math.random() - 0.5) * 60;
+            
+            const brightness = 0.7 + Math.random() * 0.3;
+            particleColors[i * 3] = brightness;
+            particleColors[i * 3 + 1] = brightness;
+            particleColors[i * 3 + 2] = brightness + 0.1;
+        }
+        
+        particlesGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+        particlesGeometry.setAttribute('color', new THREE.BufferAttribute(particleColors, 3));
+        
+        function createSparkleTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 32;
+            canvas.height = 32;
+            const ctx = canvas.getContext('2d');
+            const gradient = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+            gradient.addColorStop(0, 'rgba(255,255,255,1)');
+            gradient.addColorStop(0.5, 'rgba(255,255,255,0.5)');
+            gradient.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 32, 32);
+            return new THREE.CanvasTexture(canvas);
+        }
+        
+        const particlesMaterial = new THREE.PointsMaterial({
+            size: 0.08,
+            vertexColors: true,
+            transparent: true,
+            opacity: 1,
+            blending: THREE.AdditiveBlending,
+            map: createSparkleTexture()
+        });
+        
+        const particleSystem = new THREE.Points(particlesGeometry, particlesMaterial);
+        scene.add(particleSystem);
+
+        // HORIZONTAL ENERGY FIELD CYLINDERS
+        const energyRings = [];
+        for (let i = 0; i < 8; i++) {
+            const energyRingGeometry = new THREE.TorusGeometry(12 + i * 2.5, 0.1, 16, 100);
+            const ringMaterial = new THREE.MeshBasicMaterial({
+                color: [0xff6b9d, 0x9d6bff, 0x6bffd9, 0xffd96b, 0xff66ff, 0x66ffcc, 0xffcc66, 0xcc66ff][i],
+                transparent: true,
+                opacity: 0.3,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                depthTest: false
+            });
+            const ring = new THREE.Mesh(energyRingGeometry, ringMaterial);
+            ring.rotation.x = Math.PI / 2;
+            ring.position.y = 0.8 + i * 0.3;
+            ring.renderOrder = -10;
+            energyRings.push({
+                mesh: ring,
+                baseY: ring.position.y,
+                speed: 0.3 + i * 0.15,
+                phase: i * 0.5
+            });
+            scene.add(ring);
+            
+            const glowGeometry1 = new THREE.TorusGeometry(12 + i * 2.5, 0.25, 16, 100);
+            const glowMaterial1 = new THREE.MeshBasicMaterial({
+                color: [0xff6b9d, 0x9d6bff, 0x6bffd9, 0xffd96b, 0xff66ff, 0x66ffcc, 0xffcc66, 0xcc66ff][i],
+                transparent: true,
+                opacity: 0.15,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                depthTest: false
+            });
+            const glow1 = new THREE.Mesh(glowGeometry1, glowMaterial1);
+            ring.add(glow1);
+            
+            const glowGeometry2 = new THREE.TorusGeometry(12 + i * 2.5, 0.4, 16, 100);
+            const glowMaterial2 = new THREE.MeshBasicMaterial({
+                color: [0xff6b9d, 0x9d6bff, 0x6bffd9, 0xffd96b, 0xff66ff, 0x66ffcc, 0xffcc66, 0xcc66ff][i],
+                transparent: true,
+                opacity: 0.08,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                depthTest: false
+            });
+            const glow2 = new THREE.Mesh(glowGeometry2, glowMaterial2);
+            ring.add(glow2);
+        }
+        
+        // Energy beams
+        const beamCount = 12;
+        const energyBeams = [];
+        for (let i = 0; i < beamCount; i++) {
+            const angle = (i / beamCount) * Math.PI * 2;
+            const beamGeometry = new THREE.CylinderGeometry(0.05, 0.05, 3, 8);
+            const beamMaterial = new THREE.MeshBasicMaterial({
+                color: [0xff6b9d, 0x9d6bff, 0x6bffd9, 0xffd96b][i % 4],
+                transparent: true,
+                opacity: 0.2,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                depthTest: false
+            });
+            const beam = new THREE.Mesh(beamGeometry, beamMaterial);
+            beam.position.set(Math.cos(angle) * 15, 2, Math.sin(angle) * 15);
+            beam.renderOrder = -10;
+            energyBeams.push({ mesh: beam, angle: angle, offset: i });
+            scene.add(beam);
+        }
+
+        // Energy particles
+        const energyParticleCount = 300;
+        const energyParticlesGeometry = new THREE.BufferGeometry();
+        const energyPositions = new Float32Array(energyParticleCount * 3);
+        const energyColors = new Float32Array(energyParticleCount * 3);
+        
+        for (let i = 0; i < energyParticleCount; i++) {
+            const angle = (i / energyParticleCount) * Math.PI * 2;
+            const radius = 10 + Math.random() * 20;
+            energyPositions[i * 3] = Math.cos(angle) * radius;
+            energyPositions[i * 3 + 1] = Math.random() * 6;
+            energyPositions[i * 3 + 2] = Math.sin(angle) * radius;
+            
+            const colors = [[1, 0.42, 0.61], [0.61, 0.42, 1], [0.42, 1, 0.85], [1, 0.85, 0.42], [1, 0.4, 1]];
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            energyColors[i * 3] = color[0];
+            energyColors[i * 3 + 1] = color[1];
+            energyColors[i * 3 + 2] = color[2];
+        }
+        
+        energyParticlesGeometry.setAttribute('position', new THREE.BufferAttribute(energyPositions, 3));
+        energyParticlesGeometry.setAttribute('color', new THREE.BufferAttribute(energyColors, 3));
+        
+        const energyParticlesMaterial = new THREE.PointsMaterial({
+            size: 0.12,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.9,
+            blending: THREE.AdditiveBlending,
+            map: createSparkleTexture()
+        });
+        
+        const energyParticleSystem = new THREE.Points(energyParticlesGeometry, energyParticlesMaterial);
+        scene.add(energyParticleSystem);
+
+        // Butterflies
+        const butterflies = [];
+        for (let i = 0; i < 8; i++) {
+            const butterflyGroup = new THREE.Group();
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = 128;
+            canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            
+            ctx.fillStyle = ['#ff6b9d', '#9d6bff', '#6bffd9', '#ffd96b'][i % 4];
+            ctx.shadowColor = ctx.fillStyle;
+            ctx.shadowBlur = 15;
+            
+            ctx.beginPath();
+            ctx.ellipse(40, 64, 28, 38, -0.3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.beginPath();
+            ctx.ellipse(45, 64, 15, 22, -0.3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = ['#ff6b9d', '#9d6bff', '#6bffd9', '#ffd96b'][i % 4];
+            ctx.beginPath();
+            ctx.ellipse(88, 64, 28, 38, 0.3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.beginPath();
+            ctx.ellipse(83, 64, 15, 22, 0.3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            const bodyGradient = ctx.createLinearGradient(64, 50, 64, 78);
+            bodyGradient.addColorStop(0, '#ffffff');
+            bodyGradient.addColorStop(1, '#cccccc');
+            ctx.fillStyle = bodyGradient;
+            ctx.fillRect(62, 50, 4, 28);
+            
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(64, 52);
+            ctx.lineTo(58, 45);
+            ctx.moveTo(64, 52);
+            ctx.lineTo(70, 45);
+            ctx.stroke();
+            
+            ctx.fillStyle = 'rgba(255,255,255,0.9)';
+            for (let s = 0; s < 5; s++) {
+                ctx.beginPath();
+                ctx.arc(35 + Math.random() * 25, 60 + Math.random() * 10, 2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(78 + Math.random() * 25, 60 + Math.random() * 10, 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            const butterflyMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true });
+            const butterfly = new THREE.Sprite(butterflyMaterial);
+            butterfly.scale.set(0.5, 0.5, 1);
+            
+            butterflyGroup.add(butterfly);
+            butterflyGroup.position.set((Math.random() - 0.5) * 40, 2 + Math.random() * 4, (Math.random() - 0.5) * 40);
+            
+            butterflies.push({
+                group: butterflyGroup,
+                speed: 0.01 + Math.random() * 0.02,
+                offset: Math.random() * Math.PI * 2
+            });
+            scene.add(butterflyGroup);
+        }
+
+        // Orbs
+        const orbs = [];
+        for (let i = 0; i < 12; i++) {
+            const orbGeometry = new THREE.SphereGeometry(0.3, 16, 16);
+            const orbMaterial = new THREE.MeshBasicMaterial({
+                color: [0xff6b9d, 0x9d6bff, 0x6bffd9, 0xffd96b][i % 4],
+                transparent: true,
+                opacity: 0.6
+            });
+            const orb = new THREE.Mesh(orbGeometry, orbMaterial);
+            orb.position.set((Math.random() - 0.5) * 50, 1 + Math.random() * 5, (Math.random() - 0.5) * 50);
+            orbs.push({
+                mesh: orb,
+                speed: 0.005 + Math.random() * 0.01,
+                radius: 5 + Math.random() * 10,
+                angle: Math.random() * Math.PI * 2,
+                height: orb.position.y
+            });
+            scene.add(orb);
+            
+            const glowGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+            const glowMaterial = new THREE.MeshBasicMaterial({
+                color: [0xff6b9d, 0x9d6bff, 0x6bffd9, 0xffd96b][i % 4],
+                transparent: true,
+                opacity: 0.3,
+                blending: THREE.AdditiveBlending
+            });
+            const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+            orb.add(glow);
+        }
+
+        const sparkles = [];
+
+        // Floor
+        const floorGeometry = new THREE.PlaneGeometry(120, 120);
+        const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x1a0a2e, roughness: 0.9 });
+        const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+        floor.rotation.x = -Math.PI / 2;
+        scene.add(floor);
+        
+        const floorCanvas = document.createElement('canvas');
+        floorCanvas.width = 2048;
+        floorCanvas.height = 2048;
+        const floorCtx = floorCanvas.getContext('2d');
+        
+        const floorGradient = floorCtx.createRadialGradient(1024, 1024, 0, 1024, 1024, 1024);
+        floorGradient.addColorStop(0, '#2a1a4e');
+        floorGradient.addColorStop(1, '#0a0612');
+        floorCtx.fillStyle = floorGradient;
+        floorCtx.fillRect(0, 0, 2048, 2048);
+        
+        floorCtx.strokeStyle = '#9d6bff';
+        floorCtx.lineWidth = 2;
+        floorCtx.shadowColor = '#9d6bff';
+        floorCtx.shadowBlur = 20;
+        const gridSize = 100;
+        for (let i = 0; i < 2048; i += gridSize) {
+            floorCtx.globalAlpha = 0.3;
+            floorCtx.beginPath();
+            floorCtx.moveTo(i, 0);
+            floorCtx.lineTo(i, 2048);
+            floorCtx.stroke();
+            floorCtx.beginPath();
+            floorCtx.moveTo(0, i);
+            floorCtx.lineTo(2048, i);
+            floorCtx.stroke();
+        }
+        
+        floorCtx.globalAlpha = 0.2;
+        floorCtx.fillStyle = '#ff6b9d';
+        for (let i = 0; i < 30; i++) {
+            const x = Math.random() * 2048;
+            const y = Math.random() * 2048;
+            const size = 20 + Math.random() * 40;
+            
+            floorCtx.beginPath();
+            for (let j = 0; j < 5; j++) {
+                const angle = (j / 5) * Math.PI * 2;
+                const px = x + Math.cos(angle) * size;
+                const py = y + Math.sin(angle) * size;
+                if (j === 0) floorCtx.moveTo(px, py);
+                else floorCtx.lineTo(px, py);
+            }
+            floorCtx.closePath();
+            floorCtx.fill();
+        }
+        
+        const floorTexture = new THREE.CanvasTexture(floorCanvas);
+        floorTexture.wrapS = THREE.RepeatWrapping;
+        floorTexture.wrapT = THREE.RepeatWrapping;
+        floor.material.map = floorTexture;
+
+        const poems = [
+            { title: "Memories", text: "I can't lie I'm so scared\n23 years old and so lost\n\nI want to be a little girl again\nPlaying in the yard\nMosquitoes biting my legs\nwas the only thing that hurt.\n\nNow my heart stings like a bee\nAnd I still feel like a little girl.", x: 0, z: -18, color: 0xffb6d9 },
+            { title: "Breaking my back", text: "I'll do it for you\nI have never asked of you\nI always do what you ask\nAlways.\n\nI don't know what's worse\nnot listening to me\nOr not listening to you.", x: -10, z: -12, color: 0xff9d6b, rot: Math.PI / 4 },
+            { title: "Vices", text: "I'm drinking again\nI know it's bad\nBut it's the only thing\nthat makes me forget\n\nI'll light a blunt\nand work on it.", x: 10, z: -12, color: 0x9d6bff, rot: -Math.PI / 4 },
+            { title: "Birth", text: "I can't explain why I love you\nIt's like the way a mother\nloves her child\nIt's built into me,\nfrom the first time I saw you\n\nYou are where my soul belongs\nWhat it yearns for.\nWhat it craves for.\nYou are my home.\nI love you.", x: -13, z: -4, color: 0xff6b9d, rot: Math.PI / 2.5 },
+            { title: "Oz", text: "After everything we've been through\nI thought you would understand.\n\nBut even after everything\nyou still feel nothing\nMy tears that fall onto your hands\nAnd my heart on your shoulder\nYou shrug\n\nIt all means nothing to someone\nwho doesn't have a heart\nWhy do I keep trying to save\na tin man?", x: 13, z: -4, color: 0x6bd9ff, rot: -Math.PI / 2.5 },
+            { title: "Trickster", text: "How can you know\nthe deepest parts of me\nAnd use it against me\n\nHow are there people like you\nin the world\nWho hide behind a good person\nso well\n\nWho like a fox tricks people\ninto thinking you're an angel\nWhen you've made my life\na living hell", x: -13, z: 4, color: 0xd96bff, rot: Math.PI / 2 },
+            { title: "Reconciliation", text: "How can you love me\nThen break me\nThen love me\nPlease love me or leave me\n\nThe sad thing is\nI keep picking up the pieces\nyou break\nKnowing you will\nbreak me again.", x: 13, z: 4, color: 0xff6bd9, rot: -Math.PI / 2 },
+            { title: "Childhood", text: "Dear little sister,\nYou were there for me\nmore than you know\n\nHow many times you have\nsaved me by just being born\nAnd for being MY little sister\nMy best friend\nSomeone I can count on forever\n\nDear little sister,\nthank you for being mine.", x: -10, z: 12, color: 0xffd96b, rot: Math.PI / 6 },
+            { title: "Wounds", text: "These wounds bleed but not blood\nThese wounds were cut with\ninvisible knives.\nThe kind that comes from mouths\nThe kind that comes from minds.\n\nThey lash and gash\nI stand silently\nMy ears fill with heat\nMy throat a rock\nMy eyes on the brink of waterfalls\n\nHow can words hurt so much?", x: 10, z: 12, color: 0xff6b6b, rot: -Math.PI / 6 },
+            { title: "Never vs Always", text: "Never enough.\nNever good enough.\nNever lucky enough.\n\nI never tried to not use never.\nAlways never exists\nunless you let it.\n\nAlways enough.\nAlways good enough.\nAlways lucky enough.", x: -6, z: 20, color: 0x6bffb6, rot: Math.PI / 8 },
+            { title: "Do you remember?", text: "Do you remember,\nDo you remember everything\nI can't forget?\n\nDo you remember me\nI remember when you said\nyou'd never forget\nIt's engrained in my memory\n\nDo you remember?\nOr is it all surface level?", x: 6, z: 20, color: 0x6bffd9, rot: -Math.PI / 8 },
+            { title: "Mother", text: "I am a mother\nI am a creator of life\nMy mother gave me my life\n\nI am a kind mother\nI am a safe mother\nMy mother isn't always kind\nMy mother isn't always safe\n\nMother, why do I not\nsound like you?\nMother, did you want to be?", x: 0, z: 28, color: 0xffb66b }
+        ];
+
+        const frames = [];
+        
+        poems.forEach((poem, index) => {
+            const frameGroup = new THREE.Group();
+            
+            const backingGeometry = new THREE.PlaneGeometry(5, 6);
+            const backingMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x1a0a2e,
+                emissive: poem.color,
+                emissiveIntensity: 0.15,
+                roughness: 0.7,
+                depthTest: true,
+                depthWrite: true
+            });
+            const backing = new THREE.Mesh(backingGeometry, backingMaterial);
+            backing.renderOrder = 1000 + index * 10;
+            frameGroup.add(backing);
+            
+            const borderGeometry = new THREE.BoxGeometry(5.3, 6.3, 0.15);
+            const borderMaterial = new THREE.MeshStandardMaterial({ 
+                color: poem.color,
+                metalness: 0.6,
+                roughness: 0.3
+            });
+            const border = new THREE.Mesh(borderGeometry, borderMaterial);
+            border.position.z = -0.08;
+            border.renderOrder = 1000 + index * 10 + 1;
+            frameGroup.add(border);
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = 1024;
+            canvas.height = 1228;
+            const ctx = canvas.getContext('2d');
+            
+            ctx.fillStyle = '#0a0612';
+            ctx.fillRect(0, 0, 1024, 1228);
+            
+            for (let n = 0; n < 1000; n++) {
+                ctx.fillStyle = `rgba(${100 + Math.random() * 100}, ${80 + Math.random() * 100}, ${120 + Math.random() * 100}, 0.05)`;
+                ctx.fillRect(Math.random() * 1024, Math.random() * 1228, 2, 2);
+            }
+            
+            ctx.strokeStyle = '#' + poem.color.toString(16).padStart(6, '0');
+            ctx.lineWidth = 3;
+            ctx.shadowColor = '#' + poem.color.toString(16).padStart(6, '0');
+            ctx.shadowBlur = 10;
+            
+            for (let corner of [[100, 100], [924, 100], [100, 1128], [924, 1128]]) {
+                ctx.beginPath();
+                ctx.arc(corner[0], corner[1], 30, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(corner[0], corner[1], 20, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            
+            ctx.setLineDash([10, 10]);
+            ctx.strokeRect(80, 80, 864, 1068);
+            ctx.setLineDash([]);
+            
+            ctx.shadowBlur = 0;
+            
+            ctx.fillStyle = '#' + poem.color.toString(16).padStart(6, '0');
+            ctx.font = 'italic bold 48px Georgia';
+            ctx.textAlign = 'center';
+            ctx.fillText(poem.title, 512, 100);
+            
+            ctx.strokeStyle = '#' + poem.color.toString(16).padStart(6, '0');
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(312, 130);
+            ctx.lineTo(712, 130);
+            ctx.stroke();
+            
+            ctx.fillStyle = '#e0d0f0';
+            ctx.font = '30px Georgia';
+            const lines = poem.text.split('\n');
+            lines.forEach((line, j) => {
+                ctx.fillText(line, 512, 220 + j * 45);
+            });
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.needsUpdate = true;
+            const textMaterial = new THREE.MeshBasicMaterial({ 
+                map: texture,
+                transparent: true,
+                opacity: 0.25,
+                depthTest: false,
+                depthWrite: false,
+                side: THREE.DoubleSide
+            });
+            const textMesh = new THREE.Mesh(new THREE.PlaneGeometry(4.9, 5.9), textMaterial);
+            textMesh.position.z = 0.01;
+            textMesh.renderOrder = 1000 + index * 10 + 2;
+            frameGroup.add(textMesh);
+            
+            frameGroup.position.set(poem.x, 3, poem.z);
+            if (poem.rot) frameGroup.rotation.y = poem.rot;
+            
+            frameGroup.userData = { 
+                textMaterial, 
+                backingMaterial,
+                clicks: 0,
+                maxClicks: 3,
+                broken: false,
+                cracks: []
+            };
+            frames.push(frameGroup);
+            scene.add(frameGroup);
+        });
+
+        // Add glass barriers
+        frames.forEach((frameGroup, index) => {
+            const barrierCanvas = document.createElement('canvas');
+            barrierCanvas.width = 1024;
+            barrierCanvas.height = 1228;
+            const barrierCtx = barrierCanvas.getContext('2d');
+            
+            const gradient = barrierCtx.createLinearGradient(0, 0, 1024, 1228);
+            gradient.addColorStop(0, 'rgba(200, 200, 255, 0.4)');
+            gradient.addColorStop(0.5, 'rgba(220, 220, 255, 0.5)');
+            gradient.addColorStop(1, 'rgba(200, 200, 255, 0.4)');
+            barrierCtx.fillStyle = gradient;
+            barrierCtx.fillRect(0, 0, 1024, 1228);
+            
+            barrierCtx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            barrierCtx.fillRect(50, 50, 300, 3);
+            barrierCtx.fillRect(700, 400, 250, 3);
+            barrierCtx.fillRect(100, 800, 200, 3);
+            
+            const barrierTexture = new THREE.CanvasTexture(barrierCanvas);
+            barrierTexture.needsUpdate = true;
+            const barrierMaterial = new THREE.MeshBasicMaterial({
+                map: barrierTexture,
+                transparent: true,
+                opacity: 1,
+                blending: THREE.NormalBlending,
+                depthTest: false,
+                depthWrite: false,
+                side: THREE.DoubleSide
+            });
+            const barrierMesh = new THREE.Mesh(new THREE.PlaneGeometry(4.9, 5.9), barrierMaterial);
+            barrierMesh.position.z = 0.02;
+            barrierMesh.renderOrder = 1000 + index * 10 + 3;
+            frameGroup.add(barrierMesh);
+            
+            frameGroup.userData.barrierMesh = barrierMesh;
+            frameGroup.userData.barrierCanvas = barrierCanvas;
+            frameGroup.userData.barrierCtx = barrierCtx;
+            frameGroup.userData.barrierTexture = barrierTexture;
+        });
+
+        function drawCrack(ctx, x, y, clickNum) {
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.lineWidth = 3;
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+            ctx.shadowBlur = 5;
+            
+            const branches = 4 + Math.floor(Math.random() * 3);
+            
+            for (let i = 0; i < branches; i++) {
+                const angle = (Math.random() * Math.PI * 2);
+                const length = 80 + Math.random() * 120 * clickNum;
+                
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                
+                let currentX = x;
+                let currentY = y;
+                let currentAngle = angle;
+                
+                const segments = 5 + Math.floor(Math.random() * 8);
+                for (let j = 0; j < segments; j++) {
+                    currentAngle += (Math.random() - 0.5) * 0.5;
+                    const segLength = length / segments;
+                    currentX += Math.cos(currentAngle) * segLength;
+                    currentY += Math.sin(currentAngle) * segLength;
+                    ctx.lineTo(currentX, currentY);
+                    
+                    if (Math.random() > 0.6) {
+                        const subAngle = currentAngle + (Math.random() - 0.5) * Math.PI / 2;
+                        const subLength = segLength * 0.5;
+                        const subX = currentX + Math.cos(subAngle) * subLength;
+                        const subY = currentY + Math.sin(subAngle) * subLength;
+                        ctx.moveTo(currentX, currentY);
+                        ctx.lineTo(subX, subY);
+                        ctx.moveTo(currentX, currentY);
+                    }
+                }
+                ctx.stroke();
+            }
+            
+            ctx.shadowBlur = 0;
+        }
+
+        window.addEventListener('click', (e) => {
+            const rect = renderer.domElement.getBoundingClientRect();
+            const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+            const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+            
+            const clickRaycaster = new THREE.Raycaster();
+            clickRaycaster.setFromCamera(new THREE.Vector2(x, y), camera);
+            
+            let allFrameMeshes = [];
+            frames.forEach(frame => {
+                frame.children.forEach(child => {
+                    allFrameMeshes.push(child);
+                });
+            });
+            
+            const frameIntersects = clickRaycaster.intersectObjects(allFrameMeshes, false);
+            
+            if (frameIntersects.length > 0) {
+                let frame = null;
+                for (let f of frames) {
+                    if (f.children.includes(frameIntersects[0].object)) {
+                        frame = f;
+                        break;
+                    }
+                }
+                
+                if (frame && !frame.userData.broken) {
+                    const intersectPoint = frameIntersects[0].point;
+                    frame.userData.clicks++;
+                    
+                    console.log(`Clicked poem! Total clicks: ${frame.userData.clicks}/${frame.userData.maxClicks}`);
+                    
+                    const localPoint = frame.worldToLocal(intersectPoint.clone());
+                    const canvasX = ((localPoint.x + 2.45) / 4.9) * 1024;
+                    const canvasY = ((2.95 - localPoint.y) / 5.9) * 1228;
+                    
+                    if (frame.userData.barrierMesh && frame.userData.barrierCtx) {
+                        drawCrack(frame.userData.barrierCtx, canvasX, canvasY, frame.userData.clicks);
+                        frame.userData.barrierTexture.needsUpdate = true;
+                    }
+                    
+                    // Play glass chime on click
+                    playGlassSound(1 + (frame.userData.clicks * 0.2));
+                    
+                    for (let i = 0; i < 20; i++) {
+                        const sparkleGeometry = new THREE.SphereGeometry(0.04, 8, 8);
+                        const brightness = 0.8 + Math.random() * 0.2;
+                        const sparkleMaterial = new THREE.MeshBasicMaterial({
+                            color: new THREE.Color(brightness, brightness, brightness + 0.1),
+                            transparent: true,
+                            opacity: 1
+                        });
+                        const sparkle = new THREE.Mesh(sparkleGeometry, sparkleMaterial);
+                        
+                        sparkle.position.copy(intersectPoint);
+                        sparkle.position.x += (Math.random() - 0.5) * 0.5;
+                        sparkle.position.y += (Math.random() - 0.5) * 0.5;
+                        sparkle.position.z += (Math.random() - 0.5) * 0.5;
+                        
+                        sparkles.push({
+                            mesh: sparkle,
+                            velocity: new THREE.Vector3(
+                                (Math.random() - 0.5) * 0.15,
+                                Math.random() * 0.2 + 0.1,
+                                (Math.random() - 0.5) * 0.15
+                            ),
+                            life: 1,
+                            rotationSpeed: (Math.random() - 0.5) * 0.2
+                        });
+                        scene.add(sparkle);
+                    }
+                    
+                    if (frame.userData.clicks >= frame.userData.maxClicks) {
+                        frame.userData.broken = true;
+                        
+                        console.log('BARRIER SHATTERED!');
+                        
+                        // Play dramatic shatter sound
+                        playShatterSound();
+                        
+                        for (let i = 0; i < 30; i++) {
+                            const shardGeometry = new THREE.PlaneGeometry(
+                                0.2 + Math.random() * 0.3,
+                                0.2 + Math.random() * 0.3
+                            );
+                            const shardMaterial = new THREE.MeshBasicMaterial({
+                                color: 0xccccff,
+                                transparent: true,
+                                opacity: 0.6,
+                                side: THREE.DoubleSide
+                            });
+                            const shard = new THREE.Mesh(shardGeometry, shardMaterial);
+                            
+                            shard.position.copy(frame.position);
+                            shard.position.x += (Math.random() - 0.5) * 4;
+                            shard.position.y += (Math.random() - 0.5) * 5;
+                            shard.position.z += 0.02;
+                            
+                            sparkles.push({
+                                mesh: shard,
+                                velocity: new THREE.Vector3(
+                                    (Math.random() - 0.5) * 0.2,
+                                    (Math.random() - 0.5) * 0.2,
+                                    (Math.random() - 0.5) * 0.1
+                                ),
+                                life: 1.5,
+                                rotationSpeed: (Math.random() - 0.5) * 0.3,
+                                isShard: true
+                            });
+                            scene.add(shard);
+                        }
+                        
+                        if (frame.userData.barrierMesh) {
+                            const fadeMaterial = frame.userData.barrierMesh.material;
+                            const fadeOut = setInterval(() => {
+                                fadeMaterial.opacity -= 0.1;
+                                if (fadeMaterial.opacity <= 0) {
+                                    frame.remove(frame.userData.barrierMesh);
+                                    clearInterval(fadeOut);
+                                }
+                            }, 50);
+                        }
+                    }
+                }
+            } else {
+                // Play musical note on any click in space
+                playMouseClickSound();
+                
+                const direction = clickRaycaster.ray.direction.clone();
+                const distance = 3 + Math.random() * 2;
+                const clickPos = camera.position.clone().add(direction.multiplyScalar(distance));
+                
+                for (let i = 0; i < 30; i++) {
+                    const sparkleGeometry = new THREE.SphereGeometry(0.03, 8, 8);
+                    const brightness = 0.8 + Math.random() * 0.2;
+                    const sparkleMaterial = new THREE.MeshBasicMaterial({
+                        color: new THREE.Color(brightness, brightness, brightness + 0.1),
+                        transparent: true,
+                        opacity: 1
+                    });
+                    const sparkle = new THREE.Mesh(sparkleGeometry, sparkleMaterial);
+                    
+                    sparkle.position.copy(clickPos);
+                    sparkle.position.x += (Math.random() - 0.5) * 2;
+                    sparkle.position.y += (Math.random() - 0.5) * 2;
+                    sparkle.position.z += (Math.random() - 0.5) * 2;
+                    
+                    sparkles.push({
+                        mesh: sparkle,
+                        velocity: new THREE.Vector3(
+                            (Math.random() - 0.5) * 0.15,
+                            Math.random() * 0.2 + 0.1,
+                            (Math.random() - 0.5) * 0.15
+                        ),
+                        life: 1,
+                        rotationSpeed: (Math.random() - 0.5) * 0.2
+                    });
+                    scene.add(sparkle);
+                }
+            }
+        });
+
+        const keys = { w: false, a: false, s: false, d: false, shift: false };
+        const velocity = new THREE.Vector3();
+
+        window.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            if (key in keys) keys[key] = true;
+            if (e.key === 'Shift') keys.shift = true;
+        });
+        
+        window.addEventListener('keyup', (e) => {
+            const key = e.key.toLowerCase();
+            if (key in keys) keys[key] = false;
+            if (e.key === 'Shift') keys.shift = false;
+        });
+
+        let mouseX = 0, mouseY = 0;
+        window.addEventListener('mousemove', (e) => {
+            mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+            mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
+        });
+
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        
+        let time = 0;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            time += 0.01;
+
+            const positions = particleSystem.geometry.attributes.position.array;
+            for (let i = 0; i < particleCount; i++) {
+                positions[i * 3 + 1] += Math.sin(time * 2 + i) * 0.008;
+                positions[i * 3] += Math.cos(time + i * 0.1) * 0.005;
+                positions[i * 3 + 2] += Math.sin(time + i * 0.1) * 0.005;
+                if (positions[i * 3 + 1] > 8) positions[i * 3 + 1] = 0;
+            }
+            particleSystem.geometry.attributes.position.needsUpdate = true;
+            particleSystem.rotation.y += 0.001;
+            particlesMaterial.opacity = 0.7 + Math.sin(time * 3) * 0.3;
+
+            energyRings.forEach((ring, i) => {
+                ring.mesh.rotation.z += ring.speed * 0.01;
+                ring.mesh.position.y = ring.baseY + Math.sin(time * 0.5 + ring.phase) * 0.4;
+                
+                const pulse = 0.25 + Math.sin(time * 2 + ring.phase) * 0.15;
+                ring.mesh.material.opacity = pulse;
+                ring.mesh.children[0].material.opacity = pulse * 0.5;
+                ring.mesh.children[1].material.opacity = pulse * 0.3;
+                
+                const scale = 1 + Math.sin(time * 1.5 + ring.phase) * 0.05;
+                ring.mesh.scale.set(scale, scale, scale);
+            });
+            
+            energyBeams.forEach(beam => {
+                beam.mesh.position.y = 2 + Math.sin(time * 2 + beam.offset) * 0.5;
+                beam.mesh.material.opacity = 0.15 + Math.sin(time * 3 + beam.offset) * 0.1;
+                beam.mesh.rotation.y += 0.02;
+            });
+            
+            fogLayers.forEach(layer => {
+                layer.mesh.rotation.z += layer.speed * 0.001;
+                layer.mesh.material.opacity = 0.03 + Math.sin(time + layer.speed) * 0.02;
+            });
+            
+            const energyPos = energyParticleSystem.geometry.attributes.position.array;
+            for (let i = 0; i < energyParticleCount; i++) {
+                const angle = (i / energyParticleCount) * Math.PI * 2 + time * 0.3;
+                const radius = 10 + Math.sin(time + i * 0.1) * 10;
+                energyPos[i * 3] = Math.cos(angle) * radius;
+                energyPos[i * 3 + 1] += Math.sin(time * 2 + i * 0.1) * 0.01;
+                energyPos[i * 3 + 2] = Math.sin(angle) * radius;
+                
+                if (energyPos[i * 3 + 1] > 6) energyPos[i * 3 + 1] = 0;
+                if (energyPos[i * 3 + 1] < 0) energyPos[i * 3 + 1] = 6;
+            }
+            energyParticleSystem.geometry.attributes.position.needsUpdate = true;
+
+            butterflies.forEach(b => {
+                b.offset += b.speed;
+                b.group.position.x += Math.sin(b.offset) * 0.05;
+                b.group.position.y += Math.cos(b.offset * 2) * 0.02;
+                b.group.position.z += Math.cos(b.offset) * 0.05;
+                b.group.rotation.y = Math.sin(b.offset) * 0.3;
+                
+                const scale = 0.5 + Math.sin(time * 10) * 0.1;
+                b.group.children[0].scale.set(scale, 0.5, 1);
+            });
+
+            orbs.forEach(orb => {
+                orb.angle += orb.speed;
+                orb.mesh.position.x = Math.cos(orb.angle) * orb.radius;
+                orb.mesh.position.z = Math.sin(orb.angle) * orb.radius;
+                orb.mesh.position.y = orb.height + Math.sin(time + orb.angle) * 0.5;
+                
+                const pulse = 0.3 + Math.sin(time * 2 + orb.angle) * 0.2;
+                orb.mesh.children[0].material.opacity = pulse;
+            });
+
+            for (let i = sparkles.length - 1; i >= 0; i--) {
+                const sparkle = sparkles[i];
+                sparkle.mesh.position.add(sparkle.velocity);
+                sparkle.velocity.y -= sparkle.isShard ? 0.015 : 0.008;
+                sparkle.life -= sparkle.isShard ? 0.01 : 0.015;
+                sparkle.mesh.material.opacity = sparkle.life;
+                sparkle.mesh.scale.setScalar(sparkle.isShard ? sparkle.life : sparkle.life * 2);
+                sparkle.mesh.rotation.x += sparkle.rotationSpeed;
+                sparkle.mesh.rotation.y += sparkle.rotationSpeed;
+                
+                if (sparkle.life <= 0) {
+                    scene.remove(sparkle.mesh);
+                    sparkles.splice(i, 1);
+                }
+            }
+
+            const speed = keys.shift ? 0.3 : 0.15;
+            velocity.set(0, 0, 0);
+            
+            const forward = new THREE.Vector3(0, 0, -1);
+            const right = new THREE.Vector3(1, 0, 0);
+            forward.applyQuaternion(camera.quaternion);
+            right.applyQuaternion(camera.quaternion);
+            forward.y = 0;
+            right.y = 0;
+            forward.normalize();
+            right.normalize();
+            
+            if (keys.w) velocity.add(forward.multiplyScalar(speed));
+            if (keys.s) velocity.add(forward.multiplyScalar(-speed));
+            if (keys.a) velocity.add(right.multiplyScalar(-speed));
+            if (keys.d) velocity.add(right.multiplyScalar(speed));
+            
+            camera.position.add(velocity);
+            camera.position.y = 1.6;
+
+            camera.rotation.order = 'YXZ';
+            camera.rotation.y = -mouseX * 0.5;
+            camera.rotation.x = mouseY * 0.3;
+
+            mouse.x = mouseX;
+            mouse.y = mouseY;
+            raycaster.setFromCamera(mouse, camera);
+            
+            const intersects = raycaster.intersectObjects(frames.map(f => f.children[0]));
+            
+            frames.forEach(frame => {
+                if (!frame.userData.broken) {
+                    frame.userData.textMaterial.opacity = 0.25;
+                }
+                frame.userData.backingMaterial.emissiveIntensity = 0.15;
+            });
+            
+            if (intersects.length > 0) {
+                const frame = intersects[0].object.parent;
+                if (!frame.userData.broken) {
+                    frame.userData.textMaterial.opacity = 0.5;
+                } else {
+                    frame.userData.textMaterial.opacity = 1;
+                }
+                frame.userData.backingMaterial.emissiveIntensity = 0.4;
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
